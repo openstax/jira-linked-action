@@ -1,0 +1,9 @@
+name: PR
+
+on: [pull_request]
+
+jobs:
+  test:
+    name: Jira 
+    steps:
+    - uses: openstax/jira-linked-action@main 
