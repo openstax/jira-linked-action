@@ -1,12 +1,21 @@
 name: 'Jira Linked'
 description: 'checks pr to see if it links to a jira issue'
 inputs:
-  jira-project:
+  jira_site:
+    description: 'jira site domain'
+    required: true
+  jira_project:
     description: 'the jira project to search within'
+    required: true
+  jira_email:
+    description: 'jira email'
+    required: true
+  jira_token:
+    description: 'jira token'
     required: true
 outputs:
   issues:
     description: 'found issues, comma separated'
 runs:
   using: 'node20'
-  main: 'index.js'
+  main: 'dist/index.js'
