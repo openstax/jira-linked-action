@@ -9,4 +9,4 @@ outputs:
     description: 'found issues, comma separated'
 runs:
   using: 'node20'
-  main: 'index.js'
+  main: 'dist/index.js'
