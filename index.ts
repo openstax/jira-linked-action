@@ -20,11 +20,10 @@ const doCheck = async() => {
   const payload = github.context.payload;
   console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
-
-  const bodyData = `{
-    "jql": "project = ${project} and resolution is empty and development[pullrequests].open > 0",
-    "maxResults": 1000,
-  }`;
+  const bodyData = JSON.stringify({
+    jql: "project = ${project} and resolution is empty and development[pullrequests].open > 0",
+    maxResults: 1000
+  });
 
   const response = await fetch(`https://${site}.atlassian.net/rest/api/2/search`, {
     method: 'POST',
