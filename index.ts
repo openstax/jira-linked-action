@@ -22,11 +22,11 @@ const doCheck = async() => {
 
 
   const bodyData = `{
-    "jql": "project = ${project}",
+    "jql": "project = ${project} and resolution is empty and development[pullrequests].open > 0",
     "maxResults": 1000,
   }`;
 
-  const response = await fetch(`https://${site}.atlassian.net/rest/api/2/search/id`, {
+  const response = await fetch(`https://${site}.atlassian.net/rest/api/2/search`, {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${Buffer.from(
