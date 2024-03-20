@@ -4,6 +4,12 @@ inputs:
   jira-project:
     description: 'the jira project to search within'
     required: true
+  jira-email:
+    description: 'jira email'
+    required: true
+  jira-token:
+    description: 'jira token'
+    required: true
 outputs:
   issues:
     description: 'found issues, comma separated'

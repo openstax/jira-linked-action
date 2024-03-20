@@ -8,3 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: openstax/jira-linked-action@v0.1.4
+      with:
+        jira-project: DISCO
+        jira-email: ${{ secrets.JiraEmail }}
+        jira-token: ${{ secrets.JiraToken }}
+

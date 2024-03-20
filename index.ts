@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import api, { route } from "@forge/api";
+import fetch from 'node-fetch';
 
 /*
  * jira docs:
@@ -11,21 +11,27 @@ import api, { route } from "@forge/api";
  *  https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action
  */
 const doCheck = async() => {
+  const site = core.getInput('jira-site');
   const project = core.getInput('jira-project');
+  const authEmail = core.getInput('jira-email');
+  const authToken = core.getInput('jira-token');
   core.setOutput("hello", "world");
   // Get the JSON webhook payload for the event that triggered the workflow
   const payload = github.context.payload;
   console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
-  var bodyData = `{
+
+  const bodyData = `{
     "jql": "project = ${project}",
     "maxResults": 1000,
-    "nextPageToken": "EgQIlMIC"
   }`;
 
-  const response = await api.asUser().requestJira(route`/rest/api/2/search/id`, {
+  const response = await fetch(`https://${site}.atlassian.net/rest/api/2/search/id`, {
     method: 'POST',
     headers: {
+      'Authorization': `Basic ${Buffer.from(
+        `${authEmail}:${authToken}`
+      ).toString('base64')}`,
       'Accept': 'application/json',
       'Content-Type': 'application/json'
     },
