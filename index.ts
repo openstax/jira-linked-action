@@ -36,14 +36,11 @@ const doCheck = async() => {
   const project = core.getInput('jira_project');
   const authEmail = core.getInput('jira_email');
   const authToken = core.getInput('jira_token');
-  // Get the JSON webhook payload for the event that triggered the workflow
   const payload = github.context.payload;
-  console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
   const prUrl = payload.pull_request.html_url;
 
   const queryDevStatus = (issue: IssueId): Promise<DevStatusResponse> => {
-
     return fetch(`https://${site}.atlassian.net/rest/dev-status/1.0/issue/details?issueId=${issue.id}&applicationType=github&dataType=pullrequest`, {
       headers: {
         'Authorization': `Basic ${Buffer.from(
@@ -95,7 +92,6 @@ const doCheck = async() => {
 
   for (const issue of issueIds) {
     const devStatus = await queryDevStatus(issue);
-    console.dir(devStatus, {depth: null});
     if (devStatus.detail.some(integration => integration.pullRequests?.some(pr => pr.url === prUrl))) {
       matchingIssueIds.push(issue);
     }
