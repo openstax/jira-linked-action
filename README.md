@@ -1,4 +1,6 @@
 
+this check ensures that PRs are linked to jira issues by searching the jira api for issues with this pr attached. meaning there are no formatting requriements for the PR itself, the PR could be manually linked in the jira UI.
+
 use it:
 ```
 name: Pull Request Workflow
