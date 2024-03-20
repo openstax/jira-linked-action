@@ -21,7 +21,7 @@ const doCheck = async() => {
   console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
   const bodyData = JSON.stringify({
-    jql: "project = ${project} and resolution is empty and development[pullrequests].open > 0",
+    jql: `project = ${project} and resolution is empty and development[pullrequests].open > 0`,
     maxResults: 1000
   });
 
