@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   test:
-    name: Jira 
+    name: Jira
     runs-on: ubuntu-latest
     steps:
-    - uses: openstax/jira-linked-action@v0.1.3
+    - uses: openstax/jira-linked-action@v0.1.4
