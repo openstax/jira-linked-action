@@ -9,8 +9,8 @@ jobs:
     steps:
     - uses: openstax/jira-linked-action@v0.1.10
       with:
-        jira-site: openstax
-        jira-project: DISCO
-        jira-email: ${{ secrets.JiraEmail }}
-        jira-token: ${{ secrets.JiraToken }}
+        jira_site: openstax
+        jira_project: DISCO
+        jira_email: ${{ secrets.JiraEmail }}
+        jira_token: ${{ secrets.JiraToken }}
 

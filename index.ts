@@ -40,11 +40,7 @@ const doCheck = async() => {
   const payload = github.context.payload;
   console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
-  // jira adds this formatting in the devStatus data
-  // in the devStatus data the "id" is the pr number with # on the front
-  const prId = `#${1 /* payload.pull_request.number */}`;
-
-  const prUrl = 'https://github.com/openstax/jira-linked-action/pull/1'; // payload.pull_request.html_url;
+  const prUrl = payload.pull_request.html_url;
 
   const queryDevStatus = (issue: IssueId): Promise<DevStatusResponse> => {
 
@@ -93,7 +89,7 @@ const doCheck = async() => {
 
     return loadAllIssueIds(newIssues);
   };
-  
+
   const issueIds = await loadAllIssueIds();
   const matchingIssueIds: IssueId[] = [];
 
@@ -104,11 +100,11 @@ const doCheck = async() => {
       matchingIssueIds.push(issue);
     }
   }
-  
+
   if (matchingIssueIds.length < 1) {
     throw new Error('no matching issues found');
   }
-  
+
   console.dir(matchingIssueIds, {depth: null});
 
   const matchingIssueIdsString = matchingIssueIds.map(i => i.key).join(',');
