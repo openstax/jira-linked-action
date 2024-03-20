@@ -1,4 +1,5 @@
 import core from '@actions/core';
+import github from '@actions/github';
 import api, { route } from "@forge/api";
 
 /*
@@ -9,11 +10,12 @@ import api, { route } from "@forge/api";
  * creating a javascript github action:
  *  https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action
  */
-try {
+const doCheck = async() => {
   const project = core.getInput('jira-project');
   core.setOutput("hello", "world");
   // Get the JSON webhook payload for the event that triggered the workflow
   const payload = github.context.payload;
+  console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
 
   var bodyData = `{
     "jql": "project = ${project}",
@@ -32,8 +34,8 @@ try {
 
   console.log(`Response: ${response.status} ${response.statusText}`);
   console.log(await response.json());
+};
 
-  console.log(`The event payload: ${JSON.stringify(payload, undefined, 2)}`);
-} catch (error) {
+doCheck().catch(error => {
   core.setFailed(error.message);
-}
+});
