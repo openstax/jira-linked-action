@@ -58,7 +58,7 @@ const doCheck = async() => {
       ...options,
       jql: `project = ${project} and resolution is empty and development[pullrequests].open > 0`,
       fields: ['id'],
-      maxResults: 10,
+      maxResults: 1000,
     });
 
     return fetch(`https://${site}.atlassian.net/rest/api/2/search`, {
@@ -92,6 +92,7 @@ const doCheck = async() => {
 
   for (const issue of issueIds) {
     const devStatus = await queryDevStatus(issue);
+
     if (devStatus.detail.some(integration => integration.pullRequests?.some(pr => pr.url === prUrl))) {
       matchingIssueIds.push(issue);
     }
