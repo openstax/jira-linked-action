@@ -56,7 +56,7 @@ const doCheck = async() => {
   const queryIssueIds = (options: {startAt: number}): Promise<IssuesResponse> => {
     const bodyData = JSON.stringify({
       ...options,
-      jql: `project = ${project} and resolution is empty and development[pullrequests].open > 0`,
+      jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
       fields: ['id'],
       maxResults: 1000,
     });
