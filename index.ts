@@ -109,5 +109,11 @@ const doCheck = async() => {
 };
 
 doCheck().catch(error => {
-  core.setFailed(error.message);
+  if (error.message === 'no matching issues found') {
+    return new Promise(resolve => setTimeout(resolve, 60000)).then(() => doCheck().catch(err => {
+      core.setFailed(err.message);
+    }));
+  } else {
+    core.setFailed(error.message);
+  }
 });
