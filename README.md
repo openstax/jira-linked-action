@@ -12,9 +12,9 @@ jobs:
     name: Jira Issue
     runs-on: ubuntu-latest
     steps:
-    - uses: openstax/jira-linked-action@v0.1.14
+    - uses: openstax/jira-linked-action@v0.1.15
       with:
-        jira_site: <jira subdomain> eg: openstx
+        jira_site: <jira subdomain> eg: openstax
         jira_project: <jira project> eg: DISCO
         jira_email: ${{ secrets.JiraEmail }}
         jira_token: ${{ secrets.JiraToken }}
@@ -23,5 +23,5 @@ jobs:
 
 build and deploy command:
 ```
-export tag=v0.1.14 && test -z "$(git status --porcelain)" && git checkout -b "branch-$tag" && yarn build && git add -f dist && git commit -m "build $tag" && git tag "$tag" && git push --tags
+export tag=v0.1.15 && test -z "$(git status --porcelain)" && git checkout -b "branch-$tag" && yarn build && git add -f dist && git commit -m "build $tag" && git tag "$tag" && git push --tags
  ```
