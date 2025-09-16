@@ -82,8 +82,9 @@ const doCheck = async() => {
     while (true) {
       const issuesResponse = await queryIssueIds(nextPageToken ? {nextPageToken} : {});
       issues = issues.concat(issuesResponse.issues);
+      nextPageToken = issuesResponse.nextPageToken;
 
-      if (issuesResponse.isLast || !issuesResponse.nextPageToken) {
+      if (issuesResponse.isLast || !nextPageToken) {
         return issues;
       }
     }
