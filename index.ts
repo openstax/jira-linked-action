@@ -61,7 +61,7 @@ const doCheck = async() => {
       maxResults: 1000,
     });
 
-    return fetch(`https://${site}.atlassian.net/rest/api/2/search`, {
+    return fetch(`https://${site}.atlassian.net/rest/api/3/search`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${Buffer.from(
