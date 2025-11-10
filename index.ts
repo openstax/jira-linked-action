@@ -17,10 +17,9 @@ interface DevStatusResponse {
 }
 
 interface IssuesResponse {
-  startAt: number;
-  maxResults: number;
-  total: number;
   issues: IssueId[];
+  nextPageToken?: string;
+  isLast: boolean;
 }
 
 /*
@@ -53,15 +52,15 @@ const doCheck = async() => {
       .then(response => response.json())
     ;
   };
-  const queryIssueIds = (options: {startAt: number}): Promise<IssuesResponse> => {
+  const queryIssueIds = (options: {nextPageToken?: string}): Promise<IssuesResponse> => {
     const bodyData = JSON.stringify({
       ...options,
       jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
-      fields: ['id'],
+      fields: ['id', 'key'],
       maxResults: 1000,
     });
 
-    return fetch(`https://${site}.atlassian.net/rest/api/2/search`, {
+    return fetch(`https://${site}.atlassian.net/rest/api/3/search/jql`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${Buffer.from(
@@ -76,15 +75,19 @@ const doCheck = async() => {
     ;
   };
 
-  const loadAllIssueIds = async (previous: IssueId[] = []): Promise<IssueId[]> => {
-    const issuesResponse = await queryIssueIds({startAt: previous.length});
-    const newIssues = [...previous, ...issuesResponse.issues];
+  const loadAllIssueIds = async (): Promise<IssueId[]> => {
+    let issues: IssueId[] = [];
+    let nextPageToken: string | undefined = undefined;
 
-    if (issuesResponse.issues.length < 1 || issuesResponse.total <= newIssues.length) {
-      return newIssues;
+    while (true) {
+      const issuesResponse = await queryIssueIds(nextPageToken ? {nextPageToken} : {});
+      issues = issues.concat(issuesResponse.issues);
+      nextPageToken = issuesResponse.nextPageToken;
+
+      if (issuesResponse.isLast || !nextPageToken) {
+        return issues;
+      }
     }
-
-    return loadAllIssueIds(newIssues);
   };
 
   const issueIds = await loadAllIssueIds();
