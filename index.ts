@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import fetch, { Response } from 'node-fetch';
 
 // Project redirect mapping (e.g., when a project is renamed)
 const projectRedirects: Record<string, string> = {
@@ -85,14 +84,15 @@ const doCheck = async() => {
     if (!octokit) return [];
 
     try {
-      const commits = await octokit.rest.pulls.listCommits({
+      const commits = await octokit.paginate(octokit.rest.pulls.listCommits, {
         owner: github.context.repo.owner,
         repo: github.context.repo.repo,
         pull_number: payload.pull_request.number,
+        per_page: 100,
       });
 
       const allKeys: string[] = [];
-      commits.data.forEach(commit => {
+      commits.forEach(commit => {
         if (commit.commit.message) {
           allKeys.push(...extractIssueKeys(commit.commit.message));
         }

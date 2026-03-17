@@ -1,4 +1,3 @@
-
 this check ensures that PRs are linked to jira issues by searching the jira api for issues with this pr attached. meaning there are no formatting requriements for the PR itself, the PR could be manually linked in the jira UI.
 
 the action first attempts a fast search by extracting Jira issue keys (e.g., `CORE-123`) from the PR title, description, and commit messages, then checks those specific issues. If no issue keys are found or they don't match, it falls back to searching all unresolved issues with PRs.
@@ -22,6 +21,7 @@ jobs:
         jira_token: ${{ secrets.JiraToken }}
 ```
 
+this action has a hardcoded redirect mapping where `DISCO` → `CORE`. If you configure `jira_project: DISCO`, the action will search for `CORE-*` issue keys instead. This is specific to openstax's project rename.
 
 build and deploy command:
 ```
