@@ -111,7 +111,7 @@ const doCheck = async() => {
       });
       return [...new Set(allKeys)];
     } catch (error) {
-      console.error('Could not fetch commits:', error);
+      console.error('Could not fetch GitHub commits:', error);
       return [];
     }
   };
@@ -120,7 +120,7 @@ const doCheck = async() => {
   const queryIssuesByKeys = async(issueKeys: string[]): Promise<IssueId[]> => {
     if (issueKeys.length === 0) return [];
     if (issueKeys.length > 1000) {
-      throw new Error(`Too many issue keys found: ${issueKeys.length}. Maximum is 1000.`);
+      throw new Error(`Too many Jira issue keys found: ${issueKeys.length}. Maximum is 1000.`);
     }
 
     const jql = `key in (${issueKeys.join(',')})`;
@@ -180,7 +180,7 @@ const doCheck = async() => {
           allPrUrls.push(pr.url);
         });
       });
-      console.log(`Issue ${issue.key} is linked to the following PRs:`, allPrUrls);
+      console.log(`Jira issue ${issue.key} is linked to the following GitHub PRs:`, allPrUrls);
 
       if (devStatus.detail.some(integration =>
         integration.pullRequests?.some(pr => pr.url === prUrl)
@@ -198,7 +198,7 @@ const doCheck = async() => {
   const commitKeys = await getCommitIssueKeys();
   const allExtractedKeys = [...new Set([...titleKeys, ...bodyKeys, ...commitKeys])];
 
-  console.log('Found issue keys:', allExtractedKeys);
+  console.log('Found Jira issue keys:', allExtractedKeys);
 
   let matchingIssueIds: IssueId[] = [];
 
@@ -211,12 +211,12 @@ const doCheck = async() => {
   if (matchingIssueIds.length === 0) {
     console.log('No issues found by key. Falling back to searching all issues...');
     const issueIds = await loadAllIssueIds();
-    console.log(`Checking ${issueIds.length} issue(s) with PRs...`);
+    console.log(`Checking ${issueIds.length} Jira issue(s) with linked GitHub PRs...`);
     matchingIssueIds = await findMatchingIssues(issueIds);
   }
 
   if (matchingIssueIds.length < 1) {
-    throw new Error('No matching issues found');
+    throw new Error('No matching Jira issues found');
   }
 
   const matchingIssueIdsString = matchingIssueIds.map(i => i.key).join(',');
@@ -224,7 +224,7 @@ const doCheck = async() => {
 };
 
 doCheck().catch(async error => {
-  if (error.message === 'No matching issues found') {
+  if (error.message === 'No matching Jira issues found') {
     return new Promise(resolve => setTimeout(resolve, 60000)).then(() => doCheck().catch(err => {
       core.setFailed(err.message);
     }));
