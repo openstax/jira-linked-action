@@ -19,8 +19,17 @@ jobs:
         jira_project: <jira project> eg: DISCO
         jira_email: ${{ secrets.JiraEmail }}
         jira_token: ${{ secrets.JiraToken }}
+        # github_token: ${{ github.token }}  # optional, defaults to github.token
 ```
 
+inputs:
+- **`jira_site`** (required): Jira subdomain (e.g., `openstax`)
+- **`jira_project`** (required): Jira project key (e.g., `DISCO`)
+- **`jira_email`** (required): Jira authentication email
+- **`jira_token`** (required): Jira API token
+- **`github_token`** (optional): GitHub token for fetching commit messages. Defaults to `${{ github.token }}` if not provided.
+
+project redirects:
 this action has a hardcoded redirect mapping where `DISCO` → `CORE`. If you configure `jira_project: DISCO`, the action will search for `CORE-*` issue keys instead. This is specific to openstax's project rename.
 
 build and deploy command:

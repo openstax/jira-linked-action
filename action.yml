@@ -13,6 +13,10 @@ inputs:
   jira_token:
     description: 'jira token'
     required: true
+  github_token:
+    description: 'GitHub token for fetching commit messages'
+    required: false
+    default: ${{ github.token }}
 outputs:
   issues:
     description: 'found issues, comma separated'

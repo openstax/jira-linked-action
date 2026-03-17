@@ -27,24 +27,13 @@ interface IssuesResponse {
 }
 
 class ApiError extends Error {
-  public readonly status: number;
-  public readonly statusText: string;
-
   constructor(
-    public response: Response,
-    public responseBody?: string
+    public status: number,
+    public statusText: string,
+    public responseBody: string
   ) {
-    const status = response.status;
-    const statusText = response.statusText;
-    super(`HTTP ${status} ${statusText}${responseBody ? `: ${responseBody}` : ''}`);
+    super(`Jira API error ${status} ${statusText}: ${responseBody}`);
     this.name = 'ApiError';
-    this.status = status;
-    this.statusText = statusText;
-  }
-
-  static async create(response: Response): Promise<ApiError> {
-    const errorText = await response.text();
-    return new ApiError(response, errorText);
   }
 }
 
@@ -62,15 +51,35 @@ const doCheck = async() => {
   const project = projectRedirects[projectInput] || projectInput;
   const authEmail = core.getInput('jira_email');
   const authToken = core.getInput('jira_token');
+  const githubToken = core.getInput('github_token', { required: false });
   const payload = github.context.payload;
 
   const prUrl = payload.pull_request.html_url;
   const prTitle = payload.pull_request.title;
   const prBody = payload.pull_request.body || '';
 
-  // Get GitHub token for API calls (automatically available in GitHub Actions)
-  const githubToken = process.env.GITHUB_TOKEN;
+  // Get GitHub token for API calls
   const octokit = githubToken ? github.getOctokit(githubToken) : null;
+
+  // Helper for Jira API calls with consistent error handling
+  const fetchJira = async<T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+    const response = await fetch(`https://${site}.atlassian.net${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${authEmail}:${authToken}`).toString('base64')}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(response.status, response.statusText, errorText);
+    }
+
+    return await response.json();
+  };
 
   // Extract issue keys from text using regex
   const extractIssueKeys = (text: string): string[] => {
@@ -107,91 +116,38 @@ const doCheck = async() => {
   // Query specific issues by keys
   const queryIssuesByKeys = async(issueKeys: string[]): Promise<IssueId[]> => {
     if (issueKeys.length === 0) return [];
+    if (issueKeys.length > 1000) {
+      throw new Error(`Too many issue keys found: ${issueKeys.length}. Maximum is 1000.`);
+    }
 
     const jql = `key in (${issueKeys.join(',')})`;
-    const bodyData = JSON.stringify({
-      jql,
-      fields: ['id', 'key'],
-      maxResults: issueKeys.length,
+    const data = await fetchJira<{issues: IssueId[]}>('/rest/api/3/search/jql', {
+      method: 'POST',
+      body: JSON.stringify({
+        jql,
+        fields: ['id', 'key'],
+        maxResults: issueKeys.length,
+      }),
     });
 
-    try {
-      const response = await fetch(`https://${site}.atlassian.net/rest/api/3/search/jql`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(
-            `${authEmail}:${authToken}`
-          ).toString('base64')}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: bodyData
-      });
-
-      if (!response.ok) {
-        throw await ApiError.create(response);
-      }
-
-      const data = await response.json();
-      return data.issues || [];
-    } catch (error) {
-      console.error('Error querying issues by keys:', error);
-      return [];
-    }
+    return data.issues || [];
   };
 
   const queryDevStatus = async(issue: IssueId): Promise<DevStatusResponse> => {
-    try {
-      const response = await fetch(`https://${site}.atlassian.net/rest/dev-status/1.0/issue/details?issueId=${issue.id}&applicationType=github&dataType=pullrequest`, {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(
-            `${authEmail}:${authToken}`
-          ).toString('base64')}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-      });
-
-      if (!response.ok) {
-        throw await ApiError.create(response);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`Error querying dev status for issue ${issue.key}:`, error);
-      return { detail: [] };
-    }
+    return await fetchJira<DevStatusResponse>(
+      `/rest/dev-status/1.0/issue/details?issueId=${issue.id}&applicationType=github&dataType=pullrequest`
+    );
   };
   const queryIssueIds = async(options: {nextPageToken?: string}): Promise<IssuesResponse> => {
-    const bodyData = JSON.stringify({
-      ...options,
-      jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
-      fields: ['id', 'key'],
-      maxResults: 1000,
+    return await fetchJira<IssuesResponse>('/rest/api/3/search/jql', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...options,
+        jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
+        fields: ['id', 'key'],
+        maxResults: 1000,
+      }),
     });
-
-    try {
-      const response = await fetch(`https://${site}.atlassian.net/rest/api/3/search/jql`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(
-            `${authEmail}:${authToken}`
-          ).toString('base64')}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: bodyData
-      });
-
-      if (!response.ok) {
-        throw await ApiError.create(response);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error querying issue IDs:', error);
-      return { issues: [], isLast: true };
-    }
   };
 
   const loadAllIssueIds = async (): Promise<IssueId[]> => {
