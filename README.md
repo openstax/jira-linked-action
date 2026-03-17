@@ -1,5 +1,6 @@
-
 this check ensures that PRs are linked to jira issues by searching the jira api for issues with this pr attached. meaning there are no formatting requriements for the PR itself, the PR could be manually linked in the jira UI.
+
+the action first attempts a fast search by extracting Jira issue keys (e.g., `CORE-123`) from the PR title, description, and commit messages, then checks those specific issues. If no issue keys are found or they don't match, it falls back to searching all unresolved issues with PRs.
 
 use it:
 ```
@@ -12,16 +13,26 @@ jobs:
     name: Jira Issue
     runs-on: ubuntu-latest
     steps:
-    - uses: openstax/jira-linked-action@v0.1.15
+    - uses: openstax/jira-linked-action@v0.1.16
       with:
         jira_site: <jira subdomain> eg: openstax
         jira_project: <jira project> eg: DISCO
         jira_email: ${{ secrets.JiraEmail }}
         jira_token: ${{ secrets.JiraToken }}
+        # github_token: ${{ github.token }}  # optional, defaults to github.token
 ```
 
+inputs:
+- **`jira_site`** (required): Jira subdomain (e.g., `openstax`)
+- **`jira_project`** (required): Jira project key (e.g., `DISCO`)
+- **`jira_email`** (required): Jira authentication email
+- **`jira_token`** (required): Jira API token
+- **`github_token`** (optional): GitHub token for fetching commit messages. Defaults to `${{ github.token }}` if not provided.
+
+project redirects:
+this action has a hardcoded redirect mapping where `DISCO` → `CORE`. If you configure `jira_project: DISCO`, the action will search for `CORE-*` issue keys instead. This is specific to openstax's project rename.
 
 build and deploy command:
 ```
-export tag=v0.1.15 && test -z "$(git status --porcelain)" && git checkout -b "branch-$tag" && yarn build && git add -f dist && git commit -m "build $tag" && git tag "$tag" && git push --tags
+export tag=v0.1.16 && test -z "$(git status --porcelain)" && git checkout -b "branch-$tag" && yarn build && git add -f dist && git commit -m "build $tag" && git tag "$tag" && git push --tags
  ```

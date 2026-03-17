@@ -1,6 +1,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import fetch from 'node-fetch';
+
+// Project redirect mapping (e.g., when a project is renamed)
+const projectRedirects: Record<string, string> = {
+  'DISCO': 'CORE',
+};
 
 interface IssueId {
   id: string;
@@ -18,8 +22,19 @@ interface DevStatusResponse {
 
 interface IssuesResponse {
   issues: IssueId[];
-  nextPageToken?: string;
   isLast: boolean;
+  nextPageToken?: string;
+}
+
+class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public responseBody: string
+  ) {
+    super(`Jira API error ${status} ${statusText}: ${responseBody}`);
+    this.name = 'ApiError';
+  }
 }
 
 /*
@@ -32,47 +47,110 @@ interface IssuesResponse {
  */
 const doCheck = async() => {
   const site = core.getInput('jira_site');
-  const project = core.getInput('jira_project');
+  const projectInput = core.getInput('jira_project');
+  const project = projectRedirects[projectInput] || projectInput;
   const authEmail = core.getInput('jira_email');
   const authToken = core.getInput('jira_token');
+  const githubToken = core.getInput('github_token', { required: false });
   const payload = github.context.payload;
 
   const prUrl = payload.pull_request.html_url;
+  const prTitle = payload.pull_request.title;
+  const prBody = payload.pull_request.body || '';
 
-  const queryDevStatus = (issue: IssueId): Promise<DevStatusResponse> => {
-    return fetch(`https://${site}.atlassian.net/rest/dev-status/1.0/issue/details?issueId=${issue.id}&applicationType=github&dataType=pullrequest`, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(
-          `${authEmail}:${authToken}`
-        ).toString('base64')}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-    })
-      .then(response => response.json())
-    ;
-  };
-  const queryIssueIds = (options: {nextPageToken?: string}): Promise<IssuesResponse> => {
-    const bodyData = JSON.stringify({
+  // Get GitHub token for API calls
+  const octokit = githubToken ? github.getOctokit(githubToken) : null;
+
+  // Helper for Jira API calls with consistent error handling
+  const fetchJira = async<T>(endpoint: string, options: RequestInit = {}): Promise<T> => {
+    const response = await fetch(`https://${site}.atlassian.net${endpoint}`, {
       ...options,
-      jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
-      fields: ['id', 'key'],
-      maxResults: 1000,
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${authEmail}:${authToken}`).toString('base64')}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
     });
 
-    return fetch(`https://${site}.atlassian.net/rest/api/3/search/jql`, {
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(response.status, response.statusText, errorText);
+    }
+
+    return await response.json();
+  };
+
+  // Validate Jira credentials before proceeding
+  await fetchJira('/rest/api/3/myself');
+
+  // Extract issue keys from text using regex
+  const extractIssueKeys = (text: string): string[] => {
+    const regex = new RegExp(`\\b${project}-\\d+\\b`, 'gi');
+    const matches = text.match(regex);
+    return matches ? [...new Set(matches.map(m => m.toUpperCase()))] : [];
+  };
+
+  // Get commits and extract issue keys from commit messages
+  const getCommitIssueKeys = async(): Promise<string[]> => {
+    if (!octokit) return [];
+
+    try {
+      const commits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        pull_number: payload.pull_request.number,
+        per_page: 100,
+      });
+
+      const allKeys: string[] = [];
+      commits.forEach(commit => {
+        if (commit.commit.message) {
+          allKeys.push(...extractIssueKeys(commit.commit.message));
+        }
+      });
+      return [...new Set(allKeys)];
+    } catch (error) {
+      console.error('Could not fetch GitHub commits:', error);
+      return [];
+    }
+  };
+
+  // Query specific issues by keys
+  const queryIssuesByKeys = async(issueKeys: string[]): Promise<IssueId[]> => {
+    if (issueKeys.length === 0) return [];
+    if (issueKeys.length > 1000) {
+      throw new Error(`Too many Jira issue keys found: ${issueKeys.length}. Maximum is 1000.`);
+    }
+
+    const jql = `key in (${issueKeys.join(',')})`;
+    const data = await fetchJira<{issues: IssueId[]}>('/rest/api/3/search/jql', {
       method: 'POST',
-      headers: {
-        'Authorization': `Basic ${Buffer.from(
-          `${authEmail}:${authToken}`
-        ).toString('base64')}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: bodyData
-    })
-      .then(response => response.json())
-    ;
+      body: JSON.stringify({
+        jql,
+        fields: ['id', 'key'],
+        maxResults: issueKeys.length,
+      }),
+    });
+
+    return data.issues || [];
+  };
+
+  const queryDevStatus = async(issue: IssueId): Promise<DevStatusResponse> => {
+    return await fetchJira<DevStatusResponse>(
+      `/rest/dev-status/1.0/issue/details?issueId=${issue.id}&applicationType=github&dataType=pullrequest`
+    );
+  };
+  const queryIssueIds = async(options: {nextPageToken?: string}): Promise<IssuesResponse> => {
+    return await fetchJira<IssuesResponse>('/rest/api/3/search/jql', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...options,
+        jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
+        fields: ['id', 'key'],
+        maxResults: 1000,
+      }),
+    });
   };
 
   const loadAllIssueIds = async (): Promise<IssueId[]> => {
@@ -90,29 +168,64 @@ const doCheck = async() => {
     }
   };
 
-  const issueIds = await loadAllIssueIds();
-  const matchingIssueIds: IssueId[] = [];
+  // Find matching issues
+  const findMatchingIssues = async(issueIds: IssueId[]): Promise<IssueId[]> => {
+    const matchingIssueIds: IssueId[] = [];
 
-  for (const issue of issueIds) {
-    const devStatus = await queryDevStatus(issue);
+    for (const issue of issueIds) {
+      const devStatus = await queryDevStatus(issue);
+      const allPrUrls: string[] = [];
+      devStatus.detail.forEach(integration => {
+        integration.pullRequests?.forEach(pr => {
+          allPrUrls.push(pr.url);
+        });
+      });
+      console.log(`Jira issue ${issue.key} is linked to the following GitHub PRs:`, allPrUrls);
 
-    if (devStatus.detail.some(integration => integration.pullRequests?.some(pr => pr.url === prUrl))) {
-      matchingIssueIds.push(issue);
+      if (devStatus.detail.some(integration =>
+        integration.pullRequests?.some(pr => pr.url === prUrl)
+      )) {
+        matchingIssueIds.push(issue);
+      }
     }
+
+    return matchingIssueIds;
+  };
+
+  // Try fast path: extract issue keys from PR and commits
+  const titleKeys = extractIssueKeys(prTitle);
+  const bodyKeys = extractIssueKeys(prBody);
+  const commitKeys = await getCommitIssueKeys();
+  const allExtractedKeys = [...new Set([...titleKeys, ...bodyKeys, ...commitKeys])];
+
+  console.log('Found Jira issue keys:', allExtractedKeys);
+
+  let matchingIssueIds: IssueId[] = [];
+
+  if (allExtractedKeys.length > 0) {
+    const extractedIssues = await queryIssuesByKeys(allExtractedKeys);
+    matchingIssueIds = await findMatchingIssues(extractedIssues);
+  }
+
+  // Fall back to slow path if fast path didn't find anything
+  if (matchingIssueIds.length === 0) {
+    console.log('No issues found by key. Falling back to searching all issues...');
+    const issueIds = await loadAllIssueIds();
+    console.log(`Checking ${issueIds.length} Jira issue(s) with linked GitHub PRs...`);
+    matchingIssueIds = await findMatchingIssues(issueIds);
   }
 
   if (matchingIssueIds.length < 1) {
-    throw new Error('no matching issues found');
+    throw new Error('No matching Jira issues found');
   }
-
-  console.dir(matchingIssueIds, {depth: null});
 
   const matchingIssueIdsString = matchingIssueIds.map(i => i.key).join(',');
   core.setOutput("issues", matchingIssueIdsString);
 };
 
-doCheck().catch(error => {
-  if (error.message === 'no matching issues found') {
+doCheck().catch(async error => {
+  if (error.message === 'No matching Jira issues found') {
+    console.log('No matching Jira issues found. Waiting 60 seconds before retrying...');
     return new Promise(resolve => setTimeout(resolve, 60000)).then(() => doCheck().catch(err => {
       core.setFailed(err.message);
     }));
