@@ -2,6 +2,11 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import fetch, { Response } from 'node-fetch';
 
+// Project redirect mapping (e.g., when a project is renamed)
+const projectRedirects: Record<string, string> = {
+  'DISCO': 'CORE',
+};
+
 interface IssueId {
   id: string;
   key: string;
@@ -44,11 +49,6 @@ class ApiError extends Error {
   }
 }
 
-// Project redirect mapping (e.g., when a project is renamed)
-const PROJECT_REDIRECTS: Record<string, string> = {
-  'DISCO': 'CORE',
-};
-
 /*
  * jira docs:
  *  https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-id-post
@@ -59,7 +59,8 @@ const PROJECT_REDIRECTS: Record<string, string> = {
  */
 const doCheck = async() => {
   const site = core.getInput('jira_site');
-  const project = core.getInput('jira_project');
+  const projectInput = core.getInput('jira_project');
+  const project = projectRedirects[projectInput] || projectInput;
   const authEmail = core.getInput('jira_email');
   const authToken = core.getInput('jira_token');
   const payload = github.context.payload;
@@ -74,8 +75,7 @@ const doCheck = async() => {
 
   // Extract issue keys from text using regex
   const extractIssueKeys = (text: string): string[] => {
-    // Use redirected project name if configured
-    const regex = new RegExp(`\\b${PROJECT_REDIRECTS[project] || project}-\\d+\\b`, 'gi');
+    const regex = new RegExp(`\\b${project}-\\d+\\b`, 'gi');
     const matches = text.match(regex);
     return matches ? [...new Set(matches.map(m => m.toUpperCase()))] : [];
   };
@@ -163,10 +163,9 @@ const doCheck = async() => {
     }
   };
   const queryIssueIds = async(options: {nextPageToken?: string}): Promise<IssuesResponse> => {
-    const effectiveProject = PROJECT_REDIRECTS[project] || project;
     const bodyData = JSON.stringify({
       ...options,
-      jql: `project = ${effectiveProject} and resolution is empty and development[pullrequests].all > 0`,
+      jql: `project = ${project} and resolution is empty and development[pullrequests].all > 0`,
       fields: ['id', 'key'],
       maxResults: 1000,
     });
