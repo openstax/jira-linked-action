@@ -81,6 +81,9 @@ const doCheck = async() => {
     return await response.json();
   };
 
+  // Validate Jira credentials before proceeding
+  await fetchJira('/rest/api/3/myself');
+
   // Extract issue keys from text using regex
   const extractIssueKeys = (text: string): string[] => {
     const regex = new RegExp(`\\b${project}-\\d+\\b`, 'gi');
