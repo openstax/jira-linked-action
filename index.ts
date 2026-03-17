@@ -225,6 +225,7 @@ const doCheck = async() => {
 
 doCheck().catch(async error => {
   if (error.message === 'No matching Jira issues found') {
+    console.log('No matching Jira issues found. Waiting 60 seconds before retrying...');
     return new Promise(resolve => setTimeout(resolve, 60000)).then(() => doCheck().catch(err => {
       core.setFailed(err.message);
     }));
